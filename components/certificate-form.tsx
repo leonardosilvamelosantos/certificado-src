@@ -18,7 +18,9 @@ export function CertificateForm() {
       const formData = new FormData(e.currentTarget)
       const result = await criarPagamento({}, formData)
       
-      if (result?.error) {
+      if (result?.success && result.invoiceUrl) {
+        window.location.href = result.invoiceUrl
+      } else if (result?.error) {
         alert(result.error)
         setLoading(false)
       }

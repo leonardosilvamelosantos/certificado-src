@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 
 export type PagamentoState = {
+  success?: boolean
+  invoiceUrl?: string
   error?: string
 }
 
@@ -182,10 +184,9 @@ export async function criarPagamento(
   } catch (err: any) {
     console.error("[Asaas] Erro fatal no processamento:", err)
     return {
-      error: err.message || "Falha de conexão. Verifique sua internet e tente novamente.",
+      error: err.message || "Erro interno no servidor.",
     }
   }
 
-  // redirect() lança internamente — fica fora do try/catch
-  redirect(invoiceUrl)
+  return { success: true, invoiceUrl }
 }

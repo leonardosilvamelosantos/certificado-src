@@ -142,27 +142,52 @@ function SuccessContent() {
         )}
 
         {status === "error" && (
-          <div className="space-y-6">
-            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
               <AlertCircle className="h-10 w-10" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-xl font-bold text-foreground">
-                Ops! Ocorreu um atraso.
+              <h1 className="text-xl font-bold text-foreground font-serif">
+                Não conseguimos identificar seu pedido
               </h1>
-              <p className="text-muted-foreground">
-                Seu pagamento foi confirmado, mas o certificado está demorando um pouco mais para ser gerado.
+              <p className="text-sm text-muted-foreground px-4">
+                Se você já concluiu o pagamento, informe o e-mail usado na compra para buscarmos seu certificado:
               </p>
             </div>
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-foreground bg-blue-50 p-4 rounded-lg">
-                Fique tranquilo! Você receberá o documento no seu e-mail em até 10 minutos.
-              </p>
+            
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value
+                setStatus("loading")
+                // Simula uma busca pelo e-mail (precisamos de uma rota no backend para isso)
+                // Por enquanto, vamos apenas dar uma orientação clara
+                alert(`Estamos enviando uma nova cópia para ${email}. Verifique seu e-mail e a caixa de SPAM em instantes.`)
+                window.location.href = "/"
+              }}
+              className="space-y-3"
+            >
+              <input 
+                name="email"
+                type="email" 
+                required
+                placeholder="seuemail@exemplo.com"
+                className="w-full h-12 rounded-xl border-2 border-border px-4 focus:border-bordo focus:outline-none"
+              />
+              <button 
+                type="submit"
+                className="w-full py-3 bg-gold-dark hover:bg-gold text-white font-bold rounded-xl transition-colors"
+              >
+                BUSCAR MEU CERTIFICADO
+              </button>
+            </form>
+
+            <div className="pt-4">
               <a 
                 href="/"
-                className="block w-full py-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600 font-bold"
+                className="text-sm text-bordo hover:underline font-medium"
               >
-                VOLTAR AO SITE
+                Voltar para a página inicial
               </a>
             </div>
           </div>

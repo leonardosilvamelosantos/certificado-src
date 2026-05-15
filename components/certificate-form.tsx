@@ -6,6 +6,7 @@ import { Lock, Loader2 } from "lucide-react"
 export function CertificateForm() {
   const [loading, setLoading] = useState(false)
   const [nome, setNome] = useState("")
+  const [cpf, setCpf] = useState("")
   const [contato, setContato] = useState("")
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -58,6 +59,29 @@ export function CertificateForm() {
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 placeholder="Ex.: Maria Aparecida da Silva, Família Carvalho, etc."
+                className="h-[60px] w-full rounded-lg border-2 border-border bg-background px-4 text-lg text-foreground placeholder:text-muted-foreground/70 focus:border-bordo focus:outline-none focus:ring-2 focus:ring-bordo/30"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="cpf"
+                className="text-base font-semibold text-foreground"
+              >
+                CPF
+                <span className="block text-sm font-normal text-muted-foreground">
+                  (Exigido para emissão do Pix)
+                </span>
+              </label>
+              <input
+                id="cpf"
+                name="cpf"
+                type="text"
+                required
+                inputMode="numeric"
+                value={cpf}
+                onChange={(e) => setCpf(e.target.value)}
+                placeholder="000.000.000-00"
                 className="h-[60px] w-full rounded-lg border-2 border-border bg-background px-4 text-lg text-foreground placeholder:text-muted-foreground/70 focus:border-bordo focus:outline-none focus:ring-2 focus:ring-bordo/30"
               />
             </div>

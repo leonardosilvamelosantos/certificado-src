@@ -164,11 +164,10 @@ export async function criarPagamento(
     }
 
     invoiceUrl = payment.invoiceUrl
-  } catch (err) {
-    console.log("[v0] Erro ao processar pagamento:", err)
+  } catch (err: any) {
+    console.error("[Asaas] Erro fatal no processamento:", err)
     return {
-      error:
-        "Falha de conexão. Verifique sua internet e tente novamente.",
+      error: err.message || "Falha de conexão. Verifique sua internet e tente novamente.",
     }
   }
 

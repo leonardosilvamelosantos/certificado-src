@@ -1,36 +1,38 @@
 export function Testimonials() {
   const items = [
     {
-      quote:
-        "Emoldurei o meu na sala. Toda vez que olho, lembro do dia que subi até o Santuário.",
-      author: "Dona Lurdes, 68 anos",
+      title: "Pronto para Impressão",
+      description: "O arquivo em PDF possui alta resolução, perfeito para você imprimir no tamanho que desejar com qualidade."
     },
     {
-      quote:
-        "Foi a melhor recordação que trouxe da peregrinação. Vale cada centavo.",
-      author: "Sr. Antônio, 72 anos",
+      title: "Faça um Quadro",
+      description: "Muitos devotos emolduram o certificado para criar um lindo quadro, guardando essa recordação especial em casa."
     },
+    {
+      title: "Para Toda a Família",
+      description: "Você pode emitir o certificado no nome da sua família, eternizando a devoção de todos."
+    }
   ]
 
   return (
     <section className="w-full bg-background px-5 py-10">
       <div className="mx-auto max-w-xl">
         <h2 className="mb-6 text-center font-serif text-2xl text-bordo">
-          Um troféu da sua fé.
+          Vantagens do Certificado Digital
         </h2>
         <div className="flex flex-col gap-5">
           {items.map((t) => (
-            <figure
-              key={t.author}
+            <div
+              key={t.title}
               className="rounded-xl border border-gold/40 bg-card p-5 shadow-sm"
             >
-              <blockquote className="text-pretty text-lg leading-relaxed text-foreground">
-                &ldquo;{t.quote}&rdquo;
-              </blockquote>
-              <figcaption className="mt-3 text-sm font-semibold text-gold-dark">
-                — {t.author}
-              </figcaption>
-            </figure>
+              <h3 className="mb-2 text-lg font-semibold text-bordo">
+                {t.title}
+              </h3>
+              <p className="text-pretty text-base leading-relaxed text-foreground">
+                {t.description}
+              </p>
+            </div>
           ))}
         </div>
       </div>

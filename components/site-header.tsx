@@ -7,10 +7,10 @@ export function SiteHeader() {
         <Cross className="h-6 w-6 text-bordo" aria-hidden="true" />
         <div className="text-center">
           <p className="font-serif text-base font-semibold leading-tight text-bordo sm:text-lg">
-            Santuário Santa Rita de Caldas
+            Santa Rita de Cássia
           </p>
           <p className="text-xs uppercase tracking-widest text-gold-dark">
-            Padroeira das Causas Impossíveis
+            PADROEIRA DAS CAUSAS IMPOSSÍVEIS
           </p>
         </div>
       </div>

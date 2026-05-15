@@ -57,7 +57,7 @@ export function CertificateForm() {
                 autoComplete="name"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex.: Maria Aparecida da Silva"
+                placeholder="Ex.: Maria Aparecida da Silva, Família Carvalho, etc."
                 className="h-[60px] w-full rounded-lg border-2 border-border bg-background px-4 text-lg text-foreground placeholder:text-muted-foreground/70 focus:border-bordo focus:outline-none focus:ring-2 focus:ring-bordo/30"
               />
             </div>

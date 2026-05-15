@@ -102,7 +102,7 @@ export async function criarPagamento(
   try {
     const customerId = await getOrCreateCustomer(apiKey, nome, email, cpf)
 
-    const externalReference = JSON.stringify({ nome, email })
+    const externalReference = JSON.stringify({ nome, email, cpf })
 
     const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
       method: "POST",

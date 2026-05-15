@@ -147,11 +147,17 @@ export async function criarPagamento(
       const txt = await paymentRes.text()
       console.error("[Asaas] Erro ao criar pagamento:", txt)
       
-      let msg = "Não foi possível gerar o pagamento agora. Tente novamente."
-      if (txt.includes("invalid_cpf")) msg = "O CPF informado é inválido."
-      if (txt.includes("limit_exceeded")) msg = "Limite de cobranças excedido. Tente mais tarde."
+      let msg = ""
+      try {
+        const errObj = JSON.parse(txt)
+        if (errObj.errors && errObj.errors.length > 0) {
+          msg = `Erro no Asaas: ${errObj.errors[0].description}`
+        }
+      } catch {
+        msg = `Erro desconhecido no Asaas: ${txt.substring(0, 100)}`
+      }
 
-      return { error: msg }
+      return { error: msg || "Erro ao processar pagamento. Verifique os dados." }
     }
 
     const payment = (await paymentRes.json()) as {

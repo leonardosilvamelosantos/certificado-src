@@ -106,11 +106,15 @@ export function CertificateForm() {
               )}
             </button>
 
-            <p className="text-center text-sm text-muted-foreground">
-              Pagamento via{" "}
-              <strong className="text-foreground">Pix</strong> — aprovação na
-              hora.
-            </p>
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Pagamento via{" "}
+                <strong className="text-foreground">Pix</strong> — aprovação na hora.
+              </p>
+              <p className="text-xs text-amber-600 font-medium">
+                ⚠️ Fique de olho na sua caixa de SPAM do e-mail.
+              </p>
+            </div>
           </form>
         </div>
       </div>

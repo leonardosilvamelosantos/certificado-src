@@ -16,12 +16,10 @@ export function CertificateForm() {
 
     try {
       const formData = new FormData(e.currentTarget)
-      const result = await criarPagamento(formData)
-
-      if (result.success && result.invoiceUrl) {
-        window.location.href = result.invoiceUrl
-      } else {
-        alert(result.error || "Ocorreu um erro ao gerar o pagamento. Tente novamente.")
+      const result = await criarPagamento({}, formData)
+      
+      if (result?.error) {
+        alert(result.error)
         setLoading(false)
       }
     } catch (error) {

@@ -136,7 +136,7 @@ export async function criarPagamento(
         description: "Certificado de Peregrinação - Santa Rita de Cássia",
         externalReference,
         callback: {
-          successUrl: "https://v0-src-certificado-peregrinacao.vercel.app/sucesso?id=${paymentId}",
+          successUrl: "https://v0-src-certificado-peregrinacao.vercel.app/sucesso",
           autoRedirect: true,
         },
       }),

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react"
 import { Lock, Loader2 } from "lucide-react"
+import { criarPagamento } from "@/app/actions/pagamento"
 
 export function CertificateForm() {
   const [loading, setLoading] = useState(false)
@@ -12,11 +13,22 @@ export function CertificateForm() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
-    // Simula chamada de pagamento (substituir pela integração Asaas/Pix)
-    await new Promise((r) => setTimeout(r, 1800))
-    // Aqui você redirecionaria para o checkout real
-    // window.location.href = checkoutUrl
-    setLoading(false)
+
+    try {
+      const formData = new FormData(e.currentTarget)
+      const result = await criarPagamento(formData)
+
+      if (result.success && result.invoiceUrl) {
+        window.location.href = result.invoiceUrl
+      } else {
+        alert(result.error || "Ocorreu um erro ao gerar o pagamento. Tente novamente.")
+        setLoading(false)
+      }
+    } catch (error) {
+      console.error("Erro no checkout:", error)
+      alert("Erro de conexão. Verifique sua internet.")
+      setLoading(false)
+    }
   }
 
   return (

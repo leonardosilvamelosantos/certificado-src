@@ -1,6 +1,7 @@
 "use server"
 
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 
 export type PagamentoState = {
   error?: string
@@ -170,6 +171,14 @@ export async function criarPagamento(
     }
 
     invoiceUrl = payment.invoiceUrl
+    
+    // Gravamos o ID no cookie para recuperar na página de sucesso
+    const cookieStore = await cookies()
+    cookieStore.set("ssrc_last_payment_id", payment.id, { 
+      maxAge: 3600, // 1 hora
+      path: "/",
+      sameSite: "lax"
+    })
   } catch (err: any) {
     console.error("[Asaas] Erro fatal no processamento:", err)
     return {

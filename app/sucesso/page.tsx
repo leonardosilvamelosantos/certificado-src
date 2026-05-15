@@ -7,7 +7,7 @@ import Link from "next/navigation"
 
 function SuccessContent() {
   const searchParams = useSearchParams()
-  const paymentId = searchParams.get("id")
+  const [paymentId, setPaymentId] = useState<string | null>(null)
   
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading")
   const [attempts, setAttempts] = useState(0)
@@ -15,10 +15,31 @@ function SuccessContent() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api-certificados-ssrc.fly.dev"
 
   useEffect(() => {
-    if (!paymentId) {
-      setStatus("error")
+    // 1. Tenta pegar da URL
+    const idFromUrl = searchParams.get("id")
+    if (idFromUrl && idFromUrl !== "${paymentId}") {
+      setPaymentId(idFromUrl)
       return
     }
+
+    // 2. Tenta pegar do Cookie
+    const idFromCookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("ssrc_last_payment_id="))
+      ?.split("=")[1]
+
+    if (idFromCookie) {
+      setPaymentId(idFromCookie)
+    } else {
+      // Se não achar nada após 2 segundos, dá erro
+      setTimeout(() => {
+        if (!paymentId) setStatus("error")
+      }, 2000)
+    }
+  }, [searchParams, paymentId])
+
+  useEffect(() => {
+    if (!paymentId) return
 
     const checkStatus = async () => {
       try {

@@ -124,14 +124,13 @@ export async function criarPagamento(
 
     // Compactamos as chaves para economizar espaço no externalReference (Limite do Asaas)
     // n = nome, e = email, c = cpf
-    const externalReference = JSON.stringify({ n: nome, e: email, c: cpf })
+    let externalReference = JSON.stringify({ n: nome, e: email, c: cpf })
 
     if (externalReference.length > 100) {
       console.warn("[Asaas] externalReference muito longo, tentando versão reduzida")
-      // Versão de emergência apenas com nome essencial
       const nomeCurto = nome.split(" ")[0]
-      const extRefCurto = JSON.stringify({ n: nomeCurto, e: email, c: cpf })
-      if (extRefCurto.length > 100) {
+      externalReference = JSON.stringify({ n: nomeCurto, e: email, c: cpf })
+      if (externalReference.length > 100) {
         throw new Error("Dados do cliente muito extensos para o sistema de pagamento.")
       }
     }

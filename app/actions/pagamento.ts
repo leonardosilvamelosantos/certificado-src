@@ -1,90 +1,20 @@
 "use server"
 
-import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 
 export type PagamentoState = {
   success?: boolean
-  invoiceUrl?: string
+  checkoutUrl?: string
+  pixData?: {
+    brCode: string
+    brCodeBase64: string
+    transactionId: string
+  }
   error?: string
 }
 
-const ASAAS_API_URL =
-  process.env.ASAAS_API_URL ?? "https://api.asaas.com/v3"
-
-function getDueDate(): string {
-  // YYYY-MM-DD (data de hoje, fuso de Brasília)
-  const now = new Date()
-  const tz = new Date(now.getTime() - 3 * 60 * 60 * 1000)
-  return tz.toISOString().slice(0, 10)
-}
-
-async function getOrCreateCustomer(
-  apiKey: string,
-  nome: string,
-  email: string,
-  cpfCnpj: string,
-): Promise<string> {
-  console.log(`[Asaas] Buscando cliente por CPF: ${cpfCnpj}`)
-  
-  // Tenta encontrar cliente existente pelo CPF/CNPJ
-  try {
-    const searchRes = await fetch(
-      `${ASAAS_API_URL}/customers?cpfCnpj=${cpfCnpj}`,
-      {
-        method: "GET",
-        headers: {
-          access_token: apiKey,
-          "Content-Type": "application/json",
-        },
-        cache: "no-store",
-      },
-    )
-
-    if (searchRes.ok) {
-      const data = await searchRes.json()
-      if (data.data && data.data.length > 0) {
-        console.log(`[Asaas] Cliente encontrado: ${data.data[0].id}`)
-        return data.data[0].id
-      }
-    } else {
-      console.log(`[Asaas] Erro na busca (Status ${searchRes.status}):`, await searchRes.text())
-    }
-  } catch (err) {
-    console.error("[Asaas] Falha na rede ao buscar cliente:", err)
-  }
-
-  console.log(`[Asaas] Cliente não encontrado. Criando novo...`)
-
-  // Cria novo cliente
-  const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
-    method: "POST",
-    headers: {
-      access_token: apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name: nome, email, cpfCnpj }),
-    cache: "no-store",
-  })
-
-  const responseText = await createRes.text()
-  
-  if (!createRes.ok) {
-    console.error(`[Asaas] Erro ao criar cliente (Status ${createRes.status}):`, responseText)
-    
-    // Se o erro for de CPF já existente (mesmo com a busca falhando antes)
-    if (responseText.includes("cust_001")) { 
-       // Tenta buscar de novo sem filtro de CPF (limitação de alguns ambientes) ou tratar erro
-       throw new Error("Este CPF já está cadastrado com outro nome ou e-mail.")
-    }
-    
-    throw new Error("Falha ao cadastrar seus dados no sistema de pagamentos.")
-  }
-
-  const customer = JSON.parse(responseText)
-  console.log(`[Asaas] Novo cliente criado: ${customer.id}`)
-  return customer.id
-}
+const ABACATE_API_URL = "https://api.abacatepay.com/v2"
+const ABACATE_API_KEY = process.env.ABACATE_API_KEY ?? ""
 
 export async function criarPagamento(
   _prev: PagamentoState,
@@ -110,83 +40,87 @@ export async function criarPagamento(
     return { error: "Por favor, informe um CPF válido com 11 dígitos." }
   }
 
-  const apiKey = process.env.ASAAS_API_KEY
-  if (!apiKey) {
-    console.log("[v0] ASAAS_API_KEY não configurada")
+  if (!ABACATE_API_KEY) {
+    console.error("[AbacatePay] ABACATE_API_KEY não configurada")
     return {
-      error:
-        "Pagamento indisponível no momento. Tente novamente em instantes.",
+      error: "Pagamento indisponível no momento. Tente novamente em instantes.",
     }
   }
 
-  let invoiceUrl: string
   try {
-    const customerId = await getOrCreateCustomer(apiKey, nome, email, cpf)
+    // ── Cria o PIX via Checkout Transparente ──────────────────────────
+    console.log(`[AbacatePay] Criando PIX para ${nome} (${email})`)
 
-    const externalReference = JSON.stringify({ nome, email, cpf })
-
-    const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
+    const pixRes = await fetch(`${ABACATE_API_URL}/transparents/create`, {
       method: "POST",
       headers: {
-        access_token: apiKey,
+        Authorization: `Bearer ${ABACATE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        customer: customerId,
-        billingType: "PIX",
-        value: 10.0,
-        dueDate: getDueDate(),
-        description: "Certificado de Peregrinação - Santa Rita de Cássia",
-        externalReference,
-        callback: {
-          successUrl: "https://v0-src-certificado-peregrinacao.vercel.app/sucesso",
-          autoRedirect: true,
+        data: {
+          amount: 1000, // R$ 10,00 em centavos
+          description: "Certificado de Peregrinação - Santa Rita de Cássia",
+          expiresIn: 3600, // 1 hora para pagar
+          customer: {
+            name: nome,
+            email: email,
+            taxId: cpf,
+          },
+          metadata: {
+            nome,
+            email,
+            cpf,
+          },
         },
       }),
       cache: "no-store",
     })
 
-    if (!paymentRes.ok) {
-      const txt = await paymentRes.text()
-      console.error("[Asaas] Erro ao criar pagamento:", txt)
-      
+    const responseText = await pixRes.text()
+    console.log(`[AbacatePay] Resposta (${pixRes.status}):`, responseText.substring(0, 300))
+
+    if (!pixRes.ok) {
       let msg = ""
       try {
-        const errObj = JSON.parse(txt)
-        if (errObj.errors && errObj.errors.length > 0) {
-          msg = `Erro no Asaas: ${errObj.errors[0].description}`
-        }
+        const errObj = JSON.parse(responseText)
+        msg = errObj.error || "Erro ao processar pagamento."
       } catch {
-        msg = `Erro desconhecido no Asaas: ${txt.substring(0, 100)}`
+        msg = `Erro na AbacatePay: ${responseText.substring(0, 100)}`
       }
-
-      return { error: msg || "Erro ao processar pagamento. Verifique os dados." }
+      return { error: msg }
     }
 
-    const payment = (await paymentRes.json()) as {
-      invoiceUrl?: string
-      id: string
+    const result = JSON.parse(responseText)
+    const pixInfo = result.data
+
+    if (!pixInfo || !pixInfo.brCode) {
+      console.error("[AbacatePay] Resposta sem brCode:", responseText)
+      return { error: "Erro ao gerar o QR Code do PIX." }
     }
 
-    if (!payment.invoiceUrl) {
-      return { error: "Pagamento criado, mas sem link de cobrança." }
-    }
-
-    invoiceUrl = payment.invoiceUrl
-    
-    // Gravamos o ID no cookie para recuperar na página de sucesso
+    // Grava o ID da transação no cookie para a página de sucesso
     const cookieStore = await cookies()
-    cookieStore.set("ssrc_last_payment_id", payment.id, { 
+    cookieStore.set("ssrc_last_payment_id", pixInfo.id, {
       maxAge: 3600, // 1 hora
       path: "/",
-      sameSite: "lax"
+      sameSite: "lax",
     })
+
+    console.log(`[AbacatePay] PIX criado com sucesso: ${pixInfo.id}`)
+
+    return {
+      success: true,
+      pixData: {
+        brCode: pixInfo.brCode,
+        brCodeBase64: pixInfo.brCodeBase64,
+        transactionId: pixInfo.id,
+      },
+    }
   } catch (err: any) {
-    console.error("[Asaas] Erro fatal no processamento:", err)
+    console.error("[AbacatePay] Erro fatal no processamento:", err)
     return {
       error: err.message || "Erro interno no servidor.",
     }
   }
-
-  return { success: true, invoiceUrl }
 }

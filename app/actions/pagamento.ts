@@ -134,6 +134,7 @@ export async function criarPagamento(
       body: JSON.stringify({
         customer: customerId,
         billingType: "PIX",
+        pixKey: "certificadostaritadecassia@gmail.com",
         value: 10.0,
         dueDate: getDueDate(),
         description: "Certificado de Peregrinação - Santa Rita de Cássia",

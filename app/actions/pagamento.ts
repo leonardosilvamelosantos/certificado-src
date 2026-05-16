@@ -7,10 +7,10 @@ export type PagamentoState = {
   error?: string
 }
 
-const ASAAS_API_URL = process.env.ASAAS_API_URL ?? "https://api.asaas.com/v3"
+// URL de Produção do Asaas
+const ASAAS_API_URL = "https://api.asaas.com/v3"
 
 function getDueDate(): string {
-  // YYYY-MM-DD (data de hoje, fuso de Brasília)
   const now = new Date()
   const tz = new Date(now.getTime() - 3 * 60 * 60 * 1000)
   return tz.toISOString().slice(0, 10)
@@ -69,7 +69,7 @@ export async function criarPagamento(
   const cpf = cpfRaw.replace(/\D/g, "")
 
   if (!nome || nome.length < 2) return { error: "Informe seu nome completo." }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail válido." }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail inválido." }
   if (cpf.length !== 11) return { error: "CPF inválido." }
 
   const apiKey = process.env.ASAAS_API_KEY
@@ -78,8 +78,6 @@ export async function criarPagamento(
   let invoiceUrl: string
   try {
     const customerId = await getOrCreateCustomer(apiKey, nome, email, cpf)
-
-    // Formato original do externalReference
     const externalReference = JSON.stringify({ nome, email, cpf })
 
     const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
@@ -90,7 +88,7 @@ export async function criarPagamento(
       },
       body: JSON.stringify({
         customer: customerId,
-        billingType: "UNDEFINED", // Permite que o Asaas mostre todos os métodos disponíveis
+        billingType: "PIX", // Voltando para PIX direto
         value: 10.0,
         dueDate: getDueDate(),
         description: "Certificado de Peregrinação - Santa Rita de Cássia",
@@ -105,13 +103,11 @@ export async function criarPagamento(
 
     if (!paymentRes.ok) {
       const txt = await paymentRes.text()
-      console.log("[v0] Erro Asaas:", txt)
       return { error: `Erro no Asaas: ${txt}` }
     }
 
     const payment = await paymentRes.json()
     
-    // Gravamos o ID no cookie (isso é novo, mas essencial para a página de sucesso)
     const cookieStore = await cookies()
     cookieStore.set("ssrc_last_payment_id", payment.id, { 
       maxAge: 3600,
@@ -124,6 +120,5 @@ export async function criarPagamento(
     return { error: err.message || "Erro interno no processamento." }
   }
 
-  // Redirecionamento original
   redirect(invoiceUrl)
 }

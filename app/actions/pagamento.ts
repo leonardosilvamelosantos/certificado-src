@@ -60,19 +60,8 @@ export async function criarPagamento(
       body: JSON.stringify({
         method: "PIX",
         data: {
-          amount: 1000, // R$ 10,00 em centavos
+          amount: 1000,
           description: "Certificado de Peregrinação - Santa Rita de Cássia",
-          expiresIn: 3600, // 1 hora para pagar
-          customer: {
-            name: nome,
-            email: email,
-            taxId: cpf,
-          },
-          metadata: {
-            nome,
-            email,
-            cpf,
-          },
         },
       }),
       cache: "no-store",

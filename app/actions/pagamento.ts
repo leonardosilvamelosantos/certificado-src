@@ -1,6 +1,5 @@
 "use server"
 
-import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 
 export type PagamentoState = {
@@ -24,8 +23,6 @@ async function getOrCreateCustomer(
   email: string,
   cpfCnpj: string,
 ): Promise<string> {
-  console.log(`[Asaas] Buscando cliente por CPF: ${cpfCnpj}`)
-
   // Tenta encontrar cliente existente pelo CPF/CNPJ
   try {
     const searchRes = await fetch(
@@ -43,17 +40,12 @@ async function getOrCreateCustomer(
     if (searchRes.ok) {
       const data = await searchRes.json()
       if (data.data && data.data.length > 0) {
-        console.log(`[Asaas] Cliente encontrado: ${data.data[0].id}`)
         return data.data[0].id
       }
-    } else {
-      console.log(`[Asaas] Erro na busca (Status ${searchRes.status}):`, await searchRes.text())
     }
   } catch (err) {
-    console.error("[Asaas] Falha na rede ao buscar cliente:", err)
+    console.error("[Asaas] Falha na rede ao buscar cliente")
   }
-
-  console.log(`[Asaas] Cliente não encontrado. Criando novo...`)
 
   // Cria novo cliente
   const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
@@ -69,11 +61,9 @@ async function getOrCreateCustomer(
   const responseText = await createRes.text()
 
   if (!createRes.ok) {
-    console.error(`[Asaas] Erro ao criar cliente (Status ${createRes.status}):`, responseText)
+    console.error(`[Asaas] Erro ao criar cliente:`, responseText)
 
-    // Se o erro for de CPF já existente (mesmo com a busca falhando antes)
     if (responseText.includes("cust_001")) {
-      // Tenta buscar de novo sem filtro de CPF (limitação de alguns ambientes) ou tratar erro
       throw new Error("Este CPF já está cadastrado com outro nome ou e-mail.")
     }
 
@@ -81,7 +71,6 @@ async function getOrCreateCustomer(
   }
 
   const customer = JSON.parse(responseText)
-  console.log(`[Asaas] Novo cliente criado: ${customer.id}`)
   return customer.id
 }
 

@@ -14,12 +14,12 @@ export type PagamentoState = {
 }
 
 const ABACATE_API_URL = "https://api.abacatepay.com/v2"
-const ABACATE_API_KEY = process.env.ABACATE_API_KEY ?? ""
 
 export async function criarPagamento(
   _prev: PagamentoState,
   formData: FormData,
 ): Promise<PagamentoState> {
+  const ABACATE_API_KEY = process.env.ABACATE_API_KEY ?? ""
   const nome = String(formData.get("nome") ?? "").trim()
   const email = String(formData.get("contato") ?? "").trim()
   const cpfRaw = String(formData.get("cpf") ?? "").trim()

@@ -75,6 +75,9 @@ export async function criarPagamento(
   const apiKey = process.env.ASAAS_API_KEY
   if (!apiKey) return { error: "Erro: API_KEY não configurada." }
 
+  console.log(`[Diagnóstico] Usando URL: ${ASAAS_API_URL}`)
+  console.log(`[Diagnóstico] Chave (Início): ${apiKey.substring(0, 10)}...`)
+
   let invoiceUrl: string
   try {
     const customerId = await getOrCreateCustomer(apiKey, nome, email, cpf)

@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { CheckCircle2, Download, Loader2, Mail, AlertCircle } from "lucide-react"
-import Link from "next/navigation"
+import Link from "next/link"
 
 function SuccessContent() {
   const searchParams = useSearchParams()
@@ -17,7 +17,7 @@ function SuccessContent() {
   useEffect(() => {
     // 1. Tenta pegar da URL
     const idFromUrl = searchParams.get("id")
-    if (idFromUrl && idFromUrl !== "${paymentId}") {
+    if (idFromUrl && idFromUrl !== "undefined" && idFromUrl !== "null") {
       setPaymentId(idFromUrl)
       return
     }

@@ -15,22 +15,15 @@ export function CertificateForm() {
     setLoading(false) // Reset loading if it was true
     setLoading(true)
 
-    try {
-      const formData = new FormData(e.currentTarget)
-      const result = await criarPagamento({}, formData)
-      
-      if (result?.success && result.invoiceUrl) {
-        // Redireciona para o checkout da AbacatePay
-        window.location.href = result.invoiceUrl
-      } else if (result?.error) {
-        alert(result.error)
-        setLoading(false)
-      }
-    } catch (error) {
-      console.error("Erro no checkout:", error)
-      alert("Erro de conexão. Verifique sua internet.")
+    const formData = new FormData(e.currentTarget)
+    const result = await criarPagamento({}, formData)
+    
+    if (result?.error) {
+      alert(result.error)
       setLoading(false)
     }
+    // O redirecionamento acontece automaticamente pela Server Action
+
   }
 
   return (

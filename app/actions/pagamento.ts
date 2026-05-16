@@ -4,12 +4,17 @@ import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 
 export type PagamentoState = {
-  success?: boolean
-  invoiceUrl?: string
   error?: string
 }
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL ?? "https://api.asaas.com/v3"
+
+function getDueDate(): string {
+  // YYYY-MM-DD (data de hoje, fuso de Brasília)
+  const now = new Date()
+  const tz = new Date(now.getTime() - 3 * 60 * 60 * 1000)
+  return tz.toISOString().slice(0, 10)
+}
 
 async function getOrCreateCustomer(
   apiKey: string,
@@ -17,27 +22,23 @@ async function getOrCreateCustomer(
   email: string,
   cpfCnpj: string,
 ): Promise<string> {
-  try {
-    const searchRes = await fetch(
-      `${ASAAS_API_URL}/customers?cpfCnpj=${cpfCnpj}`,
-      {
-        method: "GET",
-        headers: {
-          access_token: apiKey,
-          "Content-Type": "application/json",
-        },
-        cache: "no-store",
+  const searchRes = await fetch(
+    `${ASAAS_API_URL}/customers?cpfCnpj=${encodeURIComponent(cpfCnpj)}`,
+    {
+      method: "GET",
+      headers: {
+        access_token: apiKey,
+        "Content-Type": "application/json",
       },
-    )
+      cache: "no-store",
+    },
+  )
 
-    if (searchRes.ok) {
-      const data = await searchRes.json()
-      if (data.data && data.data.length > 0) {
-        return data.data[0].id
-      }
+  if (searchRes.ok) {
+    const data = await searchRes.json()
+    if (data.data && data.data.length > 0) {
+      return data.data[0].id
     }
-  } catch (err) {
-    console.error("[Asaas] Erro ao buscar cliente:", err)
   }
 
   const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
@@ -51,10 +52,6 @@ async function getOrCreateCustomer(
   })
 
   if (!createRes.ok) {
-    const txt = await createRes.text()
-    if (txt.includes("cust_001")) {
-       throw new Error("Este CPF já está cadastrado com outro nome ou e-mail.")
-    }
     throw new Error("Falha ao cadastrar cliente no Asaas.")
   }
 
@@ -72,14 +69,17 @@ export async function criarPagamento(
   const cpf = cpfRaw.replace(/\D/g, "")
 
   if (!nome || nome.length < 2) return { error: "Informe seu nome completo." }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail inválido." }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail válido." }
   if (cpf.length !== 11) return { error: "CPF inválido." }
 
   const apiKey = process.env.ASAAS_API_KEY
-  if (!apiKey) return { error: "Pagamento indisponível (Erro: API_KEY)." }
+  if (!apiKey) return { error: "Erro: API_KEY não configurada." }
 
+  let invoiceUrl: string
   try {
     const customerId = await getOrCreateCustomer(apiKey, nome, email, cpf)
+
+    // Formato original do externalReference
     const externalReference = JSON.stringify({ nome, email, cpf })
 
     const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
@@ -92,7 +92,7 @@ export async function criarPagamento(
         customer: customerId,
         billingType: "PIX",
         value: 10.0,
-        dueDate: new Date().toISOString().slice(0, 10),
+        dueDate: getDueDate(),
         description: "Certificado de Peregrinação - Santa Rita de Cássia",
         externalReference,
         callback: {
@@ -105,12 +105,13 @@ export async function criarPagamento(
 
     if (!paymentRes.ok) {
       const txt = await paymentRes.text()
+      console.log("[v0] Erro Asaas:", txt)
       return { error: `Erro no Asaas: ${txt}` }
     }
 
     const payment = await paymentRes.json()
     
-    // Gravamos o ID no cookie
+    // Gravamos o ID no cookie (isso é novo, mas essencial para a página de sucesso)
     const cookieStore = await cookies()
     cookieStore.set("ssrc_last_payment_id", payment.id, { 
       maxAge: 3600,
@@ -118,8 +119,11 @@ export async function criarPagamento(
       sameSite: "lax"
     })
 
-    return { success: true, invoiceUrl: payment.invoiceUrl }
+    invoiceUrl = payment.invoiceUrl
   } catch (err: any) {
     return { error: err.message || "Erro interno no processamento." }
   }
+
+  // Redirecionamento original
+  redirect(invoiceUrl)
 }

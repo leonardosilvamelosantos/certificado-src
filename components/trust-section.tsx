@@ -33,20 +33,7 @@ export function TrustSection() {
               </p>
             </div>
           </li>
-          <li className="flex items-start gap-4">
-            <BadgeCheck
-              className="mt-1 h-7 w-7 flex-shrink-0 text-bordo"
-              aria-hidden="true"
-            />
-            <div>
-              <p className="text-base font-semibold text-foreground">
-                Documento oficial
-              </p>
-              <p className="text-base leading-relaxed text-muted-foreground">
-                Assinado pelo Pe. Reitor do Santuário, com selo de autenticidade.
-              </p>
-            </div>
-          </li>
+
         </ul>
       </div>
     </section>

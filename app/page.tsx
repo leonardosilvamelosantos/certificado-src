@@ -4,6 +4,7 @@ import { CertificateForm } from "@/components/certificate-form"
 import { TrustSection } from "@/components/trust-section"
 import { Testimonials } from "@/components/testimonials"
 import { SiteFooter } from "@/components/site-footer"
+import { MassSchedule } from "@/components/mass-schedule"
 
 export default function Page() {
   return (
@@ -14,6 +15,7 @@ export default function Page() {
       <TrustSection />
       <Testimonials />
       <SiteFooter />
+      <MassSchedule />
     </main>
   )
 }

@@ -58,6 +58,7 @@ export async function criarPagamento(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        method: "PIX",
         data: {
           amount: 1000, // R$ 10,00 em centavos
           description: "Certificado de Peregrinação - Santa Rita de Cássia",

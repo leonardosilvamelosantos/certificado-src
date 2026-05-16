@@ -90,7 +90,7 @@ export async function criarPagamento(
       },
       body: JSON.stringify({
         customer: customerId,
-        billingType: "PIX",
+        billingType: "UNDEFINED", // Permite que o Asaas mostre todos os métodos disponíveis
         value: 10.0,
         dueDate: getDueDate(),
         description: "Certificado de Peregrinação - Santa Rita de Cássia",

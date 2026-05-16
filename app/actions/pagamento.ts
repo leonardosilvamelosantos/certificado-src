@@ -4,12 +4,7 @@ import { cookies } from "next/headers"
 
 export type PagamentoState = {
   success?: boolean
-  checkoutUrl?: string
-  pixData?: {
-    brCode: string
-    brCodeBase64: string
-    transactionId: string
-  }
+  invoiceUrl?: string
   error?: string
 }
 
@@ -24,7 +19,6 @@ export async function criarPagamento(
   const email = String(formData.get("contato") ?? "").trim()
   const cpfRaw = String(formData.get("cpf") ?? "").trim()
 
-  // Remove pontuação do CPF (000.000.000-00 -> 00000000000)
   const cpf = cpfRaw.replace(/\D/g, "")
 
   if (!nome || nome.length < 2) {
@@ -41,76 +35,62 @@ export async function criarPagamento(
   }
 
   if (!ABACATE_API_KEY) {
-    console.error("[AbacatePay] ABACATE_API_KEY não configurada")
-    return {
-      error: "Pagamento indisponível no momento. Tente novamente em instantes.",
-    }
+    return { error: "Chave de API não configurada." }
   }
 
   try {
-    // ── Cria o PIX via Checkout Transparente ──────────────────────────
-    console.log(`[AbacatePay] Criando PIX para ${nome} (${email})`)
+    console.log(`[AbacatePay] Criando checkout para ${nome}`)
 
-    const pixRes = await fetch(`${ABACATE_API_URL}/transparents/create`, {
+    const res = await fetch(`${ABACATE_API_URL}/checkouts/create`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${ABACATE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        method: "PIX",
-        data: {
-          amount: 1000,
-          description: "Certificado de Peregrinação - Santa Rita de Cássia",
+        items: [
+          {
+            id: "prod_r0WPHY0FndnekYC3YYRExrcJ", // Seu ID de produto
+            quantity: 1,
+          },
+        ],
+        methods: ["PIX"],
+        // Passamos os dados do peregrino no metadata para o Webhook ler depois
+        metadata: {
+          nome,
+          email,
+          cpf,
         },
+        returnUrl: "https://v0-src-certificado-peregrinacao.vercel.app",
+        completionUrl: "https://v0-src-certificado-peregrinacao.vercel.app/sucesso",
       }),
       cache: "no-store",
     })
 
-    const responseText = await pixRes.text()
-    console.log(`[AbacatePay] Resposta (${pixRes.status}):`, responseText.substring(0, 300))
-
-    if (!pixRes.ok) {
-      let msg = ""
-      try {
-        const errObj = JSON.parse(responseText)
-        msg = errObj.error || "Erro ao processar pagamento."
-      } catch {
-        msg = `Erro na AbacatePay: ${responseText.substring(0, 100)}`
-      }
-      return { error: msg }
+    const responseText = await res.text()
+    if (!res.ok) {
+      console.error("[AbacatePay] Erro:", responseText)
+      return { error: "Erro ao criar checkout na AbacatePay." }
     }
 
     const result = JSON.parse(responseText)
-    const pixInfo = result.data
+    const checkoutUrl = result.data.url
+    const checkoutId = result.data.id
 
-    if (!pixInfo || !pixInfo.brCode) {
-      console.error("[AbacatePay] Resposta sem brCode:", responseText)
-      return { error: "Erro ao gerar o QR Code do PIX." }
-    }
-
-    // Grava o ID da transação no cookie para a página de sucesso
+    // Grava o ID no cookie para a página de sucesso
     const cookieStore = await cookies()
-    cookieStore.set("ssrc_last_payment_id", pixInfo.id, {
-      maxAge: 3600, // 1 hora
+    cookieStore.set("ssrc_last_payment_id", checkoutId, {
+      maxAge: 3600,
       path: "/",
       sameSite: "lax",
     })
 
-    console.log(`[AbacatePay] PIX criado com sucesso: ${pixInfo.id}`)
-
     return {
       success: true,
-      pixData: {
-        brCode: pixInfo.brCode,
-        brCodeBase64: pixInfo.brCodeBase64,
-        transactionId: pixInfo.id,
-      },
+      invoiceUrl: checkoutUrl,
     }
   } catch (err: any) {
-    console.error("[AbacatePay] Erro fatal no processamento:", err)
-    return {
-      error: err.message || "Erro interno no servidor.",
-    }
+    console.error("[AbacatePay] Erro fatal:", err)
+    return { error: "Erro interno ao processar pagamento." }
   }
 }

@@ -1,5 +1,6 @@
 "use server"
 
+import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 
 export type PagamentoState = {
@@ -8,89 +9,117 @@ export type PagamentoState = {
   error?: string
 }
 
-const ABACATE_API_URL = "https://api.abacatepay.com/v2"
+const ASAAS_API_URL = process.env.ASAAS_API_URL ?? "https://api.asaas.com/v3"
+
+async function getOrCreateCustomer(
+  apiKey: string,
+  nome: string,
+  email: string,
+  cpfCnpj: string,
+): Promise<string> {
+  try {
+    const searchRes = await fetch(
+      `${ASAAS_API_URL}/customers?cpfCnpj=${cpfCnpj}`,
+      {
+        method: "GET",
+        headers: {
+          access_token: apiKey,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      },
+    )
+
+    if (searchRes.ok) {
+      const data = await searchRes.json()
+      if (data.data && data.data.length > 0) {
+        return data.data[0].id
+      }
+    }
+  } catch (err) {
+    console.error("[Asaas] Erro ao buscar cliente:", err)
+  }
+
+  const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
+    method: "POST",
+    headers: {
+      access_token: apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: nome, email, cpfCnpj }),
+    cache: "no-store",
+  })
+
+  if (!createRes.ok) {
+    const txt = await createRes.text()
+    if (txt.includes("cust_001")) {
+       throw new Error("Este CPF já está cadastrado com outro nome ou e-mail.")
+    }
+    throw new Error("Falha ao cadastrar cliente no Asaas.")
+  }
+
+  const customer = await createRes.json()
+  return customer.id
+}
 
 export async function criarPagamento(
   _prev: PagamentoState,
   formData: FormData,
 ): Promise<PagamentoState> {
-  const ABACATE_API_KEY = process.env.ABACATE_API_KEY ?? ""
   const nome = String(formData.get("nome") ?? "").trim()
   const email = String(formData.get("contato") ?? "").trim()
   const cpfRaw = String(formData.get("cpf") ?? "").trim()
-
   const cpf = cpfRaw.replace(/\D/g, "")
 
-  if (!nome || nome.length < 2) {
-    return { error: "Por favor, informe seu nome completo." }
-  }
+  if (!nome || nome.length < 2) return { error: "Informe seu nome completo." }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail inválido." }
+  if (cpf.length !== 11) return { error: "CPF inválido." }
 
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  if (!emailOk) {
-    return { error: "Por favor, informe um e-mail válido." }
-  }
-
-  if (cpf.length !== 11) {
-    return { error: "Por favor, informe um CPF válido com 11 dígitos." }
-  }
-
-  if (!ABACATE_API_KEY) {
-    return { error: "Chave de API não configurada." }
-  }
+  const apiKey = process.env.ASAAS_API_KEY
+  if (!apiKey) return { error: "Pagamento indisponível (Erro: API_KEY)." }
 
   try {
-    console.log(`[AbacatePay] Criando checkout para ${nome}`)
+    const customerId = await getOrCreateCustomer(apiKey, nome, email, cpf)
+    const externalReference = JSON.stringify({ nome, email, cpf })
 
-    const res = await fetch(`${ABACATE_API_URL}/checkouts/create`, {
+    const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${ABACATE_API_KEY}`,
+        access_token: apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        items: [
-          {
-            id: "prod_r0WPHY0FndnekYC3YYRExrcJ", // Seu ID de produto
-            quantity: 1,
-          },
-        ],
-        methods: ["PIX"],
-        // Passamos os dados do peregrino no metadata para o Webhook ler depois
-        metadata: {
-          nome,
-          email,
-          cpf,
+        customer: customerId,
+        billingType: "PIX",
+        value: 10.0,
+        dueDate: new Date().toISOString().slice(0, 10),
+        description: "Certificado de Peregrinação - Santa Rita de Cássia",
+        externalReference,
+        callback: {
+          successUrl: "https://v0-src-certificado-peregrinacao.vercel.app/sucesso",
+          autoRedirect: true,
         },
-        returnUrl: "https://v0-src-certificado-peregrinacao.vercel.app",
-        completionUrl: "https://v0-src-certificado-peregrinacao.vercel.app/sucesso",
       }),
       cache: "no-store",
     })
 
-    const responseText = await res.text()
-    if (!res.ok) {
-      console.error("[AbacatePay] Erro:", responseText)
-      return { error: "Erro ao criar checkout na AbacatePay." }
+    if (!paymentRes.ok) {
+      const txt = await paymentRes.text()
+      return { error: `Erro no Asaas: ${txt}` }
     }
 
-    const result = JSON.parse(responseText)
-    const checkoutUrl = result.data.url
-    const checkoutId = result.data.id
-
-    // Grava o ID no cookie para a página de sucesso
+    const payment = await paymentRes.json()
+    
+    // Gravamos o ID no cookie
     const cookieStore = await cookies()
-    cookieStore.set("ssrc_last_payment_id", checkoutId, {
+    cookieStore.set("ssrc_last_payment_id", payment.id, { 
       maxAge: 3600,
       path: "/",
-      sameSite: "lax",
+      sameSite: "lax"
     })
 
-    return {
-      success: true,
-      invoiceUrl: checkoutUrl,
-    }
+    return { success: true, invoiceUrl: payment.invoiceUrl }
   } catch (err: any) {
-    console.error("[AbacatePay] Erro fatal:", err)
-    return { error: "Erro interno ao processar pagamento." }
+    return { error: err.message || "Erro interno no processamento." }
   }
 }

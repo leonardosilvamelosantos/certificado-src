@@ -25,7 +25,7 @@ async function getOrCreateCustomer(
   cpfCnpj: string,
 ): Promise<string> {
   console.log(`[Asaas] Buscando cliente por CPF: ${cpfCnpj}`)
-  
+
   // Tenta encontrar cliente existente pelo CPF/CNPJ
   try {
     const searchRes = await fetch(
@@ -67,16 +67,16 @@ async function getOrCreateCustomer(
   })
 
   const responseText = await createRes.text()
-  
+
   if (!createRes.ok) {
     console.error(`[Asaas] Erro ao criar cliente (Status ${createRes.status}):`, responseText)
-    
+
     // Se o erro for de CPF já existente (mesmo com a busca falhando antes)
-    if (responseText.includes("cust_001")) { 
-       // Tenta buscar de novo sem filtro de CPF (limitação de alguns ambientes) ou tratar erro
-       throw new Error("Este CPF já está cadastrado com outro nome ou e-mail.")
+    if (responseText.includes("cust_001")) {
+      // Tenta buscar de novo sem filtro de CPF (limitação de alguns ambientes) ou tratar erro
+      throw new Error("Este CPF já está cadastrado com outro nome ou e-mail.")
     }
-    
+
     throw new Error("Falha ao cadastrar seus dados no sistema de pagamentos.")
   }
 
@@ -144,7 +144,7 @@ export async function criarPagamento(
       },
       body: JSON.stringify({
         customer: customerId,
-        billingType: "UNDEFINED",
+        billingType: "PIX",
         value: 10.0,
         dueDate: getDueDate(),
         description: "Certificado de Peregrinação - Santa Rita de Cássia",
@@ -160,7 +160,7 @@ export async function criarPagamento(
     if (!paymentRes.ok) {
       const txt = await paymentRes.text()
       console.error("[Asaas] Erro ao criar pagamento:", txt)
-      
+
       let msg = ""
       try {
         const errObj = JSON.parse(txt)
@@ -184,10 +184,10 @@ export async function criarPagamento(
     }
 
     invoiceUrl = payment.invoiceUrl
-    
+
     // Gravamos o ID no cookie para recuperar na página de sucesso
     const cookieStore = await cookies()
-    cookieStore.set("ssrc_last_payment_id", payment.id, { 
+    cookieStore.set("ssrc_last_payment_id", payment.id, {
       maxAge: 3600, // 1 hora
       path: "/",
       sameSite: "lax"

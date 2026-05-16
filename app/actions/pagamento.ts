@@ -9,8 +9,7 @@ export type PagamentoState = {
   error?: string
 }
 
-const ASAAS_API_URL =
-  process.env.ASAAS_API_URL ?? "https://api.asaas.com/v3"
+const ASAAS_API_URL = "https://api.asaas.com/v3"
 
 function getDueDate(): string {
   // YYYY-MM-DD (data de hoje, fuso de Brasília)
@@ -145,7 +144,7 @@ export async function criarPagamento(
       },
       body: JSON.stringify({
         customer: customerId,
-        billingType: "UNDEFINED",
+        billingType: "PIX",
         value: 10.0,
         dueDate: getDueDate(),
         description: "Certificado de Peregrinação - Santa Rita de Cássia",

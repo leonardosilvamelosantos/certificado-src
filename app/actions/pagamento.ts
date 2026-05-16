@@ -4,13 +4,16 @@ import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 
 export type PagamentoState = {
+  success?: boolean
+  invoiceUrl?: string
   error?: string
 }
 
-// URL de Produção do Asaas
-const ASAAS_API_URL = "https://api.asaas.com/v3"
+const ASAAS_API_URL =
+  process.env.ASAAS_API_URL ?? "https://api.asaas.com/v3"
 
 function getDueDate(): string {
+  // YYYY-MM-DD (data de hoje, fuso de Brasília)
   const now = new Date()
   const tz = new Date(now.getTime() - 3 * 60 * 60 * 1000)
   return tz.toISOString().slice(0, 10)
@@ -22,25 +25,38 @@ async function getOrCreateCustomer(
   email: string,
   cpfCnpj: string,
 ): Promise<string> {
-  const searchRes = await fetch(
-    `${ASAAS_API_URL}/customers?cpfCnpj=${encodeURIComponent(cpfCnpj)}`,
-    {
-      method: "GET",
-      headers: {
-        access_token: apiKey,
-        "Content-Type": "application/json",
+  console.log(`[Asaas] Buscando cliente por CPF: ${cpfCnpj}`)
+  
+  // Tenta encontrar cliente existente pelo CPF/CNPJ
+  try {
+    const searchRes = await fetch(
+      `${ASAAS_API_URL}/customers?cpfCnpj=${cpfCnpj}`,
+      {
+        method: "GET",
+        headers: {
+          access_token: apiKey,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  )
+    )
 
-  if (searchRes.ok) {
-    const data = await searchRes.json()
-    if (data.data && data.data.length > 0) {
-      return data.data[0].id
+    if (searchRes.ok) {
+      const data = await searchRes.json()
+      if (data.data && data.data.length > 0) {
+        console.log(`[Asaas] Cliente encontrado: ${data.data[0].id}`)
+        return data.data[0].id
+      }
+    } else {
+      console.log(`[Asaas] Erro na busca (Status ${searchRes.status}):`, await searchRes.text())
     }
+  } catch (err) {
+    console.error("[Asaas] Falha na rede ao buscar cliente:", err)
   }
 
+  console.log(`[Asaas] Cliente não encontrado. Criando novo...`)
+
+  // Cria novo cliente
   const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
     method: "POST",
     headers: {
@@ -51,11 +67,22 @@ async function getOrCreateCustomer(
     cache: "no-store",
   })
 
+  const responseText = await createRes.text()
+  
   if (!createRes.ok) {
-    throw new Error("Falha ao cadastrar cliente no Asaas.")
+    console.error(`[Asaas] Erro ao criar cliente (Status ${createRes.status}):`, responseText)
+    
+    // Se o erro for de CPF já existente (mesmo com a busca falhando antes)
+    if (responseText.includes("cust_001")) { 
+       // Tenta buscar de novo sem filtro de CPF (limitação de alguns ambientes) ou tratar erro
+       throw new Error("Este CPF já está cadastrado com outro nome ou e-mail.")
+    }
+    
+    throw new Error("Falha ao cadastrar seus dados no sistema de pagamentos.")
   }
 
-  const customer = await createRes.json()
+  const customer = JSON.parse(responseText)
+  console.log(`[Asaas] Novo cliente criado: ${customer.id}`)
   return customer.id
 }
 
@@ -66,21 +93,36 @@ export async function criarPagamento(
   const nome = String(formData.get("nome") ?? "").trim()
   const email = String(formData.get("contato") ?? "").trim()
   const cpfRaw = String(formData.get("cpf") ?? "").trim()
+
+  // Remove pontuação do CPF (000.000.000-00 -> 00000000000)
   const cpf = cpfRaw.replace(/\D/g, "")
 
-  if (!nome || nome.length < 2) return { error: "Informe seu nome completo." }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "E-mail inválido." }
-  if (cpf.length !== 11) return { error: "CPF inválido." }
+  if (!nome || nome.length < 2) {
+    return { error: "Por favor, informe seu nome completo." }
+  }
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  if (!emailOk) {
+    return { error: "Por favor, informe um e-mail válido." }
+  }
+
+  if (cpf.length !== 11) {
+    return { error: "Por favor, informe um CPF válido com 11 dígitos." }
+  }
 
   const apiKey = process.env.ASAAS_API_KEY
-  if (!apiKey) return { error: "Erro: API_KEY não configurada." }
-
-  console.log(`[Diagnóstico] Usando URL: ${ASAAS_API_URL}`)
-  console.log(`[Diagnóstico] Chave (Início): ${apiKey.substring(0, 10)}...`)
+  if (!apiKey) {
+    console.log("[v0] ASAAS_API_KEY não configurada")
+    return {
+      error:
+        "Pagamento indisponível no momento. Tente novamente em instantes.",
+    }
+  }
 
   let invoiceUrl: string
   try {
     const customerId = await getOrCreateCustomer(apiKey, nome, email, cpf)
+
     const externalReference = JSON.stringify({ nome, email, cpf })
 
     const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
@@ -91,7 +133,7 @@ export async function criarPagamento(
       },
       body: JSON.stringify({
         customer: customerId,
-        billingType: "PIX", // Voltando para PIX direto
+        billingType: "PIX",
         value: 10.0,
         dueDate: getDueDate(),
         description: "Certificado de Peregrinação - Santa Rita de Cássia",
@@ -106,22 +148,45 @@ export async function criarPagamento(
 
     if (!paymentRes.ok) {
       const txt = await paymentRes.text()
-      return { error: `Erro no Asaas: ${txt}` }
+      console.error("[Asaas] Erro ao criar pagamento:", txt)
+      
+      let msg = ""
+      try {
+        const errObj = JSON.parse(txt)
+        if (errObj.errors && errObj.errors.length > 0) {
+          msg = `Erro no Asaas: ${errObj.errors[0].description}`
+        }
+      } catch {
+        msg = `Erro desconhecido no Asaas: ${txt.substring(0, 100)}`
+      }
+
+      return { error: msg || "Erro ao processar pagamento. Verifique os dados." }
     }
 
-    const payment = await paymentRes.json()
+    const payment = (await paymentRes.json()) as {
+      invoiceUrl?: string
+      id: string
+    }
+
+    if (!payment.invoiceUrl) {
+      return { error: "Pagamento criado, mas sem link de cobrança." }
+    }
+
+    invoiceUrl = payment.invoiceUrl
     
+    // Gravamos o ID no cookie para recuperar na página de sucesso
     const cookieStore = await cookies()
     cookieStore.set("ssrc_last_payment_id", payment.id, { 
-      maxAge: 3600,
+      maxAge: 3600, // 1 hora
       path: "/",
       sameSite: "lax"
     })
-
-    invoiceUrl = payment.invoiceUrl
   } catch (err: any) {
-    return { error: err.message || "Erro interno no processamento." }
+    console.error("[Asaas] Erro fatal no processamento:", err)
+    return {
+      error: err.message || "Erro interno no servidor.",
+    }
   }
 
-  redirect(invoiceUrl)
+  return { success: true, invoiceUrl }
 }

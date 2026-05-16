@@ -12,18 +12,23 @@ export function CertificateForm() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setLoading(false) // Reset loading if it was true
     setLoading(true)
 
-    const formData = new FormData(e.currentTarget)
-    const result = await criarPagamento({}, formData)
-    
-    if (result?.error) {
-      alert(result.error)
+    try {
+      const formData = new FormData(e.currentTarget)
+      const result = await criarPagamento({}, formData)
+      
+      if (result?.success && result.invoiceUrl) {
+        window.location.href = result.invoiceUrl
+      } else if (result?.error) {
+        alert(result.error)
+        setLoading(false)
+      }
+    } catch (error) {
+      console.error("Erro no checkout:", error)
+      alert("Erro de conexão. Verifique sua internet.")
       setLoading(false)
     }
-    // O redirecionamento acontece automaticamente pela Server Action
-
   }
 
   return (
@@ -125,7 +130,7 @@ export function CertificateForm() {
               {loading ? (
                 <>
                   <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-                  <span>Redirecionando...</span>
+                  <span>Processando pagamento...</span>
                 </>
               ) : (
                 <>
